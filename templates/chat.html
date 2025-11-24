@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Realtime Chat</title>
+
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 flex justify-center items-center h-screen">
+
+<div class="bg-white shadow-xl w-full max-w-lg rounded-xl p-5">
+
+    <h2 class="text-2xl font-bold mb-4 text-center text-blue-600">Realtime Chat</h2>
+
+    <!-- Chat Box -->
+    <div id="chat-box"
+         class="h-80 overflow-y-auto bg-gray-50 p-4 rounded-lg border">
+    </div>
+
+    <!-- Form -->
+    <div class="mt-4 flex gap-2">
+        <input id="msg"
+               class="flex-1 border rounded-lg px-3 py-2"
+               placeholder="Type your message..."
+               hx-trigger="keyup[key=='Enter']"
+               hx-ws="send:msg"
+        />
+
+        <button class="bg-blue-600 text-white px-5 py-2 rounded-lg"
+                hx-ws="send:msg"
+                onclick="
+                    let v=document.getElementById('msg').value;
+                    this.setAttribute('hx-vals', JSON.stringify({msg:v}));
+                    document.getElementById('msg').value='';
+                ">
+            Send
+        </button>
+    </div>
+
+    <!-- Websocket Binding -->
+    <div hx-ws="connect:/ws">
+        <div hx-ws="receive:appendToChat"></div>
+    </div>
+
+</div>
+
+<script>
+function appendToChat(msg) {
+    const box = document.getElementById("chat-box");
+    const line = document.createElement("div");
+    line.className = "p-2 bg-blue-100 rounded mb-2";
+    line.textContent = msg;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+}
+</script>
+
+</body>
+</html>
