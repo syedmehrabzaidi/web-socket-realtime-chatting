@@ -2,59 +2,304 @@
 <html>
 <head>
     <title>Realtime Chat</title>
-
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f9f9f9;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .message {
+            margin-bottom: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            animation: slideIn 0.3s ease-in;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .msg-own {
+            background: #667eea;
+            color: white;
+            margin-left: 30px;
+            border-radius: 8px 2px 8px 8px;
+        }
+        .msg-other {
+            background: #e0e0e0;
+            margin-right: 30px;
+            border-radius: 2px 8px 8px 8px;
+        }
+        .msg-system {
+            background: #fff3cd;
+            color: #856404;
+            text-align: center;
+            font-style: italic;
+            font-size: 12px;
+        }
+        .msg-username {
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 4px;
+            opacity: 0.8;
+        }
+        .msg-text {
+            word-wrap: break-word;
+        }
+        .controls {
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+            background: white;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+        #username {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            width: 140px;
+            font-size: 14px;
+        }
+        #msg {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        #msg:focus, #username:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .status {
+            font-size: 12px;
+            color: #666;
+            padding: 5px 0;
+        }
+    </style>
 </head>
 
-<body class="bg-gray-100 flex justify-center items-center h-screen">
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💬 Realtime Chat</h1>
+            <div class="status">
+                Status: <span id="status">Connecting...</span>
+            </div>
+        </div>
 
-<div class="bg-white shadow-xl w-full max-w-lg rounded-xl p-5">
+        <div id="chat-box" class="chat-box"></div>
 
-    <h2 class="text-2xl font-bold mb-4 text-center text-blue-600">Realtime Chat</h2>
-
-    <!-- Chat Box -->
-    <div id="chat-box"
-         class="h-80 overflow-y-auto bg-gray-50 p-4 rounded-lg border">
+        <div class="controls">
+            <div class="input-group">
+                <input id="username" 
+                       type="text" 
+                       placeholder="Your name"
+                       maxlength="20" />
+                <input id="msg" 
+                       type="text" 
+                       placeholder="Type message..." />
+                <button id="send">Send</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Form -->
-    <div class="mt-4 flex gap-2">
-        <input id="msg"
-               class="flex-1 border rounded-lg px-3 py-2"
-               placeholder="Type your message..."
-               hx-trigger="keyup[key=='Enter']"
-               hx-ws="send:msg"
-        />
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const msgInput = document.getElementById('msg');
+        const usernameInput = document.getElementById('username');
+        const sendBtn = document.getElementById('send');
+        const statusSpan = document.getElementById('status');
 
-        <button class="bg-blue-600 text-white px-5 py-2 rounded-lg"
-                hx-ws="send:msg"
-                onclick="
-                    let v=document.getElementById('msg').value;
-                    this.setAttribute('hx-vals', JSON.stringify({msg:v}));
-                    document.getElementById('msg').value='';
-                ">
-            Send
-        </button>
-    </div>
+        let ws = null;
+        let username = '';
+        let connected = false;
 
-    <!-- Websocket Binding -->
-    <div hx-ws="connect:/ws">
-        <div hx-ws="receive:appendToChat"></div>
-    </div>
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-</div>
+        function addMessage(type, user, text) {
+            const msg = document.createElement('div');
+            
+            if (type === 'msg') {
+                const isOwn = user === username;
+                msg.className = `message ${isOwn ? 'msg-own' : 'msg-other'}`;
+                msg.innerHTML = `
+                    <div class="msg-username">${escapeHtml(user)}</div>
+                    <div class="msg-text">${escapeHtml(text)}</div>
+                `;
+            } else if (type === 'join') {
+                msg.className = 'message msg-system';
+                msg.textContent = `✅ ${escapeHtml(user)} joined`;
+            } else if (type === 'leave') {
+                msg.className = 'message msg-system';
+                msg.textContent = `❌ ${escapeHtml(user)} left`;
+            }
+            
+            chatBox.appendChild(msg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
 
-<script>
-function appendToChat(msg) {
-    const box = document.getElementById("chat-box");
-    const line = document.createElement("div");
-    line.className = "p-2 bg-blue-100 rounded mb-2";
-    line.textContent = msg;
-    box.appendChild(line);
-    box.scrollTop = box.scrollHeight;
-}
-</script>
+        function connect() {
+            username = usernameInput.value.trim();
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
 
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    // Send join message
+                    const joinMsg = JSON.stringify({
+                        type: 'join',
+                        payload: { user: username }
+                    });
+                    ws.send(joinMsg);
+                    connected = true;
+                    statusSpan.textContent = 'Connected ✓';
+                    statusSpan.style.color = '#28a745';
+                    usernameInput.disabled = true;
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        const payload = msg.payload || {};
+                        
+                        if (msg.type === 'msg') {
+                            addMessage('msg', payload.user, payload.text);
+                        } else if (msg.type === 'join') {
+                            addMessage('join', payload.user);
+                        } else if (msg.type === 'leave') {
+                            addMessage('leave', payload.user);
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse message:', e);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    statusSpan.textContent = 'Error ✗';
+                    statusSpan.style.color = '#dc3545';
+                };
+
+                ws.onclose = () => {
+                    connected = false;
+                    statusSpan.textContent = 'Disconnected';
+                    statusSpan.style.color = '#ffc107';
+                    usernameInput.disabled = false;
+                };
+            } catch (e) {
+                console.error('Failed to connect:', e);
+                alert('Failed to connect to chat server');
+            }
+        }
+
+        function sendMessage() {
+            if (!connected) {
+                alert('Not connected. Enter your name and press Enter to connect.');
+                return;
+            }
+
+            const text = msgInput.value.trim();
+            if (!text) return;
+
+            const msg = JSON.stringify({
+                type: 'msg',
+                payload: { text: text }
+            });
+
+            try {
+                ws.send(msg);
+                msgInput.value = '';
+            } catch (e) {
+                console.error('Failed to send message:', e);
+                alert('Failed to send message');
+            }
+        }
+
+        // Event listeners
+        sendBtn.addEventListener('click', () => {
+            if (connected) {
+                sendMessage();
+            } else {
+                connect();
+            }
+        });
+        msgInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                if (connected) {
+                    sendMessage();
+                } else {
+                    alert('Not connected. Enter your name first.');
+                }
+            }
+        });
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') connect();
+        });
+    </script>
 </body>
 </html>

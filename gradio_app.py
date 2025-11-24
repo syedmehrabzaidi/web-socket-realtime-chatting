@@ -144,9 +144,15 @@ body {
     input.value = ''
   }
 
-  sendBtn.addEventListener('click', connect)
+  sendBtn.addEventListener('click', ()=>{
+    if(!connected) connect()
+    else send()
+  })
   input.addEventListener('keypress', (e)=>{
-    if(e.key === 'Enter' && connected) send()
+    if(e.key === 'Enter') {
+      if(!connected) connect()
+      else send()
+    }
   })
   userInput.addEventListener('keypress', (e)=>{
     if(e.key === 'Enter') connect()
